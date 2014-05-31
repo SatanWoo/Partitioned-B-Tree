@@ -45,7 +45,7 @@ struct BTreeKeyRange
 		end = e;
 	}
 
-	bool isInRange(int key)
+	bool contains(int key)
 	{
 		return key >= start && key <= end;
 	}
@@ -148,6 +148,7 @@ private:
 	void recursiveInsertNode(BTreeNode *node, int key, int value);
 
 	BTreeData *searchDataWithKey(BTreeNode *node, int key);
+    void layerTraverse(vector<BTreeData> &result, BTreeKeyRange range);
 };
 
 /************** Public API **************/
@@ -165,14 +166,7 @@ BTree::~BTree()
 vector<BTreeData> BTree::getRange(BTreeKeyRange range)
 {
 	vector<BTreeData> result;
-	for (int i = range.start; i <= range.end; i++)
-	{
-		BTreeData *existData = searchDataWithKey(root, i);
-		if (existData != NULL) 
-		{
-			result.push_back(existData->clone());
-		}
-	}
+	layerTraverse(result, range);
 	return result;
 }
 
@@ -180,8 +174,7 @@ void BTree::put(int key, int value)
 {
 	BTreeData *existData = searchDataWithKey(root, key);
 	if (existData != NULL) existData->data = value;
-
-	insertNode(key, value);
+    else insertNode(key, value);
 }
 
 int BTree::get(int key)
@@ -315,6 +308,38 @@ BTreeData* BTree::searchDataWithKey(BTreeNode *start, int key)
 	}
 }
 
+void BTree::layerTraverse(vector<BTreeData> &result, BTreeKeyRange range)
+{
+    if (root == NULL) return;
+    
+    queue<BTreeNode *> nodeQueue;
+    
+    nodeQueue.push(root);
+    
+    while (!nodeQueue.empty())
+    {
+        BTreeNode *head = nodeQueue.front();
+        
+        for (int i = 0; i < head->keyCount; i++) {
+            int key = head->indexes[i]->key;
+            if (range.contains(key))
+            {
+                result.push_back(head->indexes[i]->clone());
+            }
+        }
+        
+        if (head->isLeaf == false)
+        {
+            for (int i = 0; i < head->keyCount + 1; i++)
+            {
+                nodeQueue.push(head->childs[i]);
+            }
+        }
+        
+        nodeQueue.pop();
+    }
+}
+
 void BTree::insertNode(int key, int value)
 {
 	if (root == NULL) return;
@@ -396,7 +421,10 @@ int main()
     tree->put(18, 4);
     tree->put(17, 3);
     tree->printBTree();
+    
     cout << "Get is " << tree->get(9) << endl;
+    
+    
     tree->put(9, 5);
     vector<BTreeData> result = tree->getRange(BTreeKeyRange(0, 9));
     
