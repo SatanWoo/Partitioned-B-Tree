@@ -101,7 +101,7 @@ struct BTreeNode
 	void addChild(BTreeNode *child, int pos)
 	{
 		if (this == NULL || child == NULL) return;
-		if (pos >= 2 * BTreeDegree - 1 || pos < 0) return;
+		if (pos > 2 * BTreeDegree - 1 || pos < 0) return;
 		if (this->keyCount >= 2 * BTreeDegree - 1) return;
 
 		this->childs[pos] = child;
@@ -212,7 +212,12 @@ void BTree::printBTree()
             cout << endl;
             layer++;
             nodeQueue.pop();
-            cout << "Layer " << layer << ":" << " ";
+            
+            if (!nodeQueue.empty())
+            {
+                cout << "Layer " << layer << ":" << " ";
+                nodeQueue.push(nullNode);
+            }
             continue;
         }
         
@@ -224,7 +229,6 @@ void BTree::printBTree()
             }
         }
        
-        
         for (int i = 0; i < head->keyCount; i++)
         {
             cout << head->indexes[i]->key << " ";
@@ -252,11 +256,11 @@ void BTree::splitNode(BTreeNode *nodeToSplit)
 		newNode->indexes[i] = nodeToSplit->indexes[i + BTreeDegree];
 	}
 
-	if (!nodeToSplit->isLeaf)
+	if (nodeToSplit->isLeaf == false)
 	{
 		for (int i = 0; i < newNode->keyCount + 1; i++)
 		{
-			newNode->childs[i] = nodeToSplit->childs[i + BTreeDegree];
+            newNode->addChild(nodeToSplit->childs[i + BTreeDegree], i);
 		}
 	}
 
@@ -270,7 +274,7 @@ void BTree::splitNode(BTreeNode *nodeToSplit)
 		int key = parentNode->indexes[i]->key;
 		if (dataToLift->key < key) break;
 
-		insertPos ++;
+		insertPos++;
 	}
 
 	// Move Data after pos by 1 offset
@@ -329,8 +333,8 @@ void BTree::insertNode(int key, int value)
 
 void BTree::recursiveInsertNode(BTreeNode *node ,int key, int value)
 {
-	// We can assure that the node for insert must be not full with key
-	if (node->isLeaf)
+    // We can assure that the node for insert must be not full with key
+	if (node->isLeaf == true)
 	{
 		int insertPos = 0;
 		for (int i = 0; i < node->keyCount; i++)
@@ -364,7 +368,7 @@ void BTree::recursiveInsertNode(BTreeNode *node ,int key, int value)
 		if (nextLookUpNode->keyCount == 2 * BTreeDegree - 1)
 		{
 			splitNode(nextLookUpNode);
-			if (lookPos > nextLookUpNode->keyCount || key > nextLookUpNode->indexes[lookPos]->key)
+			if (key > node->indexes[lookPos]->key)
 			{
 				nextLookUpNode = node->childs[lookPos + 1];
 			}
@@ -384,6 +388,13 @@ int main()
     tree->put(4, 2);
     tree->put(0, 8);
     tree->put(9, 4);
+    tree->put(10, 4);
+    tree->put(11, 2);
+    tree->put(12, 2);
+    tree->put(13, 6);
+    tree->put(14, 20);
+    tree->put(18, 4);
+    tree->put(17, 3);
     tree->printBTree();
     cout << "Get is " << tree->get(9) << endl;
     tree->put(9, 5);
