@@ -1,15 +1,16 @@
 #include<iostream>
 #include<vector>
+#include <queue>
 using namespace std;
 
-#definde BTreeDegree 3
-typedef enum BTreeErrorCode 
+#define BTreeDegree 2
+typedef enum
 {
 	BTreeErrorCodeKeyNotFound = -1  
-};
+}BTreeErrorCode;
 
 /************** Helper **************/
-typedef struct 
+struct BTreeData
 {
 	int key;
 	int data;
@@ -28,12 +29,12 @@ typedef struct
 
 	BTreeData clone()
 	{
-		return BTreeData(this->key， this->data);
+		return BTreeData(this->key, this->data);
 	}
 
-} BTreeData;
+};
 
-typedef struct 
+struct BTreeKeyRange
 {
 	int start;
 	int end;
@@ -48,17 +49,17 @@ typedef struct
 	{
 		return key >= start && key <= end;
 	}
-} BTreeKeyRange;
+};
 /************** End of Helper **************/
 
 
-typedef struct
+struct BTreeNode
 {
 	int keyCount;
 	bool isLeaf;
 
 	BTreeData *indexes[2 * BTreeDegree - 1];
-	BTreeNode **childs[2 * BTreeDegree];
+	BTreeNode *childs[2 * BTreeDegree];
 	BTreeNode *parent;
 
 	BTreeNode()
@@ -81,20 +82,20 @@ typedef struct
 
 	~BTreeNode()
 	{
-		keyCount = 0;
-		parent = NULL;
-
-		for (int i = 0; i < 2 * BTreeDegree - 1; i++)
+		for (int i = 0; i < keyCount; i++)
 		{
-			if (indexes[i]) delete indexes[i];
-			indexes = NULL;
+			if (indexes[i] != NULL) delete indexes[i];
+			indexes[i] = NULL;
 		}
 
-		for (int i = 0; i < 2 * BTreeDegree; i++)
+		for (int i = 0; i < keyCount + 1; i++)
 		{
-			if (childs[i]) delete childs[i];
+			if (childs[i] != NULL) delete childs[i];
 			childs[i] = NULL;
 		}
+        
+        keyCount = 0;
+		parent = NULL;
 	}
 
 	void addChild(BTreeNode *child, int pos)
@@ -113,12 +114,12 @@ typedef struct
 		for (int i = 0; i < keyCount; i++)
 		{
 			BTreeData *temp = indexes[i];
-			if (temp->m_key == key) 
+			if (temp->key == key)
 			{
 				isEqual = true;
 				return i;
 			}
-			else if (key < temp->m_key)
+			else if (key < temp->key)
 			{
 				return i;
 			}
@@ -126,7 +127,7 @@ typedef struct
 		return keyCount;
 	}
 
-} BTreeNode;
+};
 
 class BTree
 {
@@ -138,15 +139,15 @@ public:
 	void put(int key ,int value);
 	int get(int key);
 
-	//void printBTree(); // Just for debug
+	void printBTree(); // Just for debug
 private:
 	BTreeNode *root;
 
 	void splitNode(BTreeNode *nodeToSplit);
 	void insertNode(int key, int value);
-	void recursiveInsertNode(BTree *node, int key, int value);
+	void recursiveInsertNode(BTreeNode *node, int key, int value);
 
-	BTreeData *searchDataWithKey(BTreeNode *node, int key, int value);
+	BTreeData *searchDataWithKey(BTreeNode *node, int key);
 };
 
 /************** Public API **************/
@@ -190,6 +191,51 @@ int BTree::get(int key)
 
 	return BTreeErrorCodeKeyNotFound;
 }
+
+void BTree::printBTree()
+{
+    if (root == NULL) return;
+    
+    int layer = 0;
+    BTreeNode *nullNode = new BTreeNode();
+    
+    queue<BTreeNode *> nodeQueue;
+    nodeQueue.push(root);
+    nodeQueue.push(nullNode);
+    
+    cout << "Layer " << 0 << ":" << " ";
+    
+    while (!nodeQueue.empty()) {
+        BTreeNode *head = nodeQueue.front();
+        if (head == nullNode)
+        {
+            cout << endl;
+            layer++;
+            nodeQueue.pop();
+            cout << "Layer " << layer << ":" << " ";
+            continue;
+        }
+        
+        if (!head->isLeaf)
+        {
+            for (int i = 0; i < head->keyCount + 1; i++)
+            {
+                nodeQueue.push(head->childs[i]);
+            }
+        }
+       
+        
+        for (int i = 0; i < head->keyCount; i++)
+        {
+            cout << head->indexes[i]->key << " ";
+        }
+        cout << "| ";
+        
+        nodeQueue.pop();
+    }
+    
+    delete nullNode;
+}
 /************** End of Public API **************/
 
 
@@ -215,7 +261,7 @@ void BTree::splitNode(BTreeNode *nodeToSplit)
 	}
 
 	BTreeData *dataToLift = nodeToSplit->indexes[BTreeDegree - 1];
-	nodeToSplit->keyCount = BTreeDegree - 1；
+	nodeToSplit->keyCount = BTreeDegree - 1;
 	BTreeNode *parentNode = nodeToSplit->parent;
 
 	int insertPos = 0;
@@ -240,16 +286,16 @@ void BTree::splitNode(BTreeNode *nodeToSplit)
 	}
 
 	parentNode->indexes[insertPos] = dataToLift;
-	parentNode->addChild(insertPos + 1, newNode);
+	parentNode->addChild(newNode, insertPos + 1);
 	parentNode->keyCount += 1;
 }
 
-BTreeData* BTree::searchDataWithKey(BTreeNode *start, int key))
+BTreeData* BTree::searchDataWithKey(BTreeNode *start, int key)
 {
 	if (start == NULL) return NULL;
 
 	bool isEqual = false;
-	int offset = start->findDataOffset(key, isEqual));
+	int offset = start->findDataOffset(key, isEqual);
 
 	if (isEqual)
 	{
@@ -267,14 +313,13 @@ BTreeData* BTree::searchDataWithKey(BTreeNode *start, int key))
 
 void BTree::insertNode(int key, int value)
 {
-	if (node == NULL) return;
+	if (root == NULL) return;
 
-	if (node == root && node->keyCount >= 2 * BTreeDegree - 1)
+	if (root && root->keyCount >= 2 * BTreeDegree - 1)
 	{
 		BTreeNode *newRoot = new BTreeNode();
-		newRoot->isLeaf = false;
 		newRoot->keyCount = 0;
-		newRoot->addChild(0, root);
+		newRoot->addChild(root, 0);
 		splitNode(root);
 		root = newRoot;
 	}
@@ -328,8 +373,27 @@ void BTree::recursiveInsertNode(BTreeNode *node ,int key, int value)
 		recursiveInsertNode(nextLookUpNode, key, value);
 	}
 }
+/************** End of Private API **************/
 
 int main()
 {
-	return 0;
+    BTree *tree = new BTree();
+    tree->put(3, 7);
+    tree->put(1, 4);
+    tree->put(5, 2);
+    tree->put(4, 2);
+    tree->put(0, 8);
+    tree->put(9, 4);
+    tree->printBTree();
+    cout << "Get is " << tree->get(9) << endl;
+    tree->put(9, 5);
+    vector<BTreeData> result = tree->getRange(BTreeKeyRange(0, 9));
+    
+    for (int i = 0; i < result.size(); i++)
+    {
+        cout << result[i].key << " " << result[i].data << endl;
+    }
+    
+    delete tree;
+    return 0;
 }
